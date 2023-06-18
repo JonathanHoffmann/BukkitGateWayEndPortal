@@ -1,0 +1,4 @@
+name: BukkitGateWayEndPortal
+version: 1.0
+main: me.jonnyfant.bukkitgatewayendportal.BukkitGateWayEndPortal
+api-version: 1.18
