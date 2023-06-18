@@ -1,62 +1,90 @@
 package me.jonnyfant.bukkitgatewayendportal;
 
+import com.comphenix.protocol.PacketType;
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.ProtocolManager;
+import com.comphenix.protocol.events.ListenerPriority;
+import com.comphenix.protocol.events.PacketAdapter;
+import com.comphenix.protocol.events.PacketEvent;
+import com.comphenix.protocol.wrappers.nbt.NbtCompound;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPortalEnterEvent;
 import org.bukkit.event.entity.EntityPortalEvent;
 import org.bukkit.event.entity.EntityTeleportEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.plugin.Plugin;
 
 public class GateWayListener implements Listener {
+    private ProtocolManager protocolManager;
+
+    public GateWayListener(Plugin plugin) {
+        this.protocolManager = ProtocolLibrary.getProtocolManager();
+        registerPacketListener(plugin);
+    }
 
     @EventHandler
-    public void onPlayerGateWay(PlayerTeleportEvent event)
-    {
+    public void onPlayerGateWay(PlayerTeleportEvent event) {
         Bukkit.broadcastMessage("Player teleport event was triggered with the cause " + event.getCause());
-        if(handleTeleport(event.getPlayer(), event.getFrom(), event.getTo(), event.getCause()))
-        {
-            event.setCancelled(true);
-        }
-    }
-    @EventHandler
-    public void onEntityGateWay(EntityPortalEvent event)
-    {
-        Bukkit.broadcastMessage("Entity teleport event was triggered");
-        if(handleTeleport(event.getEntity(), event.getFrom(), event.getTo(), null))
-        {
+        if (handleTeleport(event.getPlayer(), event.getFrom(), event.getTo(), event.getCause())) {
             event.setCancelled(true);
         }
     }
 
-    public boolean handleTeleport(Entity entity, Location from, Location to, PlayerTeleportEvent.TeleportCause cause)
-    {
-        if(cause == PlayerTeleportEvent.TeleportCause.END_GATEWAY)
-        {
+    @EventHandler
+    public void onEntityGateWay(EntityPortalEnterEvent event) {
+        Bukkit.broadcastMessage("Entity teleport event was triggered");
+        if (handleTeleport(event.getEntity(), event.getLocation(), null, null)) {
+            //event.setCancelled(true);
+        }
+    }
+
+    private void registerPacketListener(Plugin plugin) {
+        protocolManager.addPacketListener(new PacketAdapter(plugin, ListenerPriority.NORMAL,
+                PacketType.Play.Client.LOOK) {
+            @Override
+            public void onPacketReceiving(PacketEvent event) {
+
+                if (event.getPacketType() == PacketType.Play.Client.LOOK) {
+
+                    byte[] rawData = event.getPacket().getByteArrays().read(0);
+                    int packetId = rawData[0] & 0xFF;  // Convert to unsigned integer
+
+                    // Check if the packet ID matches the desired ID (0x68)
+                    if (packetId == 0x68) {
+                        // Handle the entity teleporting (packet ID 0x68)
+                        // Your code here
+                        Bukkit.broadcastMessage("detected teleportation from Protocollib");
+                    }
+
+                }
+            }
+        });
+    }
+
+    public boolean handleTeleport(Entity entity, Location from, Location to, PlayerTeleportEvent.TeleportCause cause) {
+        if (cause == PlayerTeleportEvent.TeleportCause.END_GATEWAY) {
             Bukkit.broadcastMessage("Right cause");
-        }
-        else if(from.getBlock().getType() == Material.END_GATEWAY)
-        {
+        } else if (from.getBlock().getType() == Material.END_GATEWAY) {
             Bukkit.broadcastMessage("teleportation from an End GateWay.");
-        }
-        else
-        {
+        } else {
             Bukkit.broadcastMessage("couldn't establish End Gateway as cause");
             return false;
         }
 
-        if (entity.getLocation().getWorld().getEnvironment() != World.Environment.NORMAL)
-        {
+        if (entity.getLocation().getWorld().getEnvironment() != World.Environment.NORMAL) {
             Bukkit.broadcastMessage("teleportation from not in the overworld, ignoring");
             //not in the overworld, dismissing
             return false;
         }
 
-        if(to.getWorld().getEnvironment() == World.Environment.THE_END)
-        {
+        if (to.getWorld().getEnvironment() == World.Environment.THE_END) {
             Bukkit.broadcastMessage("Teleportation target is in the end, ignoring, probably already called this.");
             //nothing to do here, already teleporting to the end
             return false;
@@ -64,18 +92,15 @@ public class GateWayListener implements Listener {
 
         //find end world
         World end = null;
-        for (World w : Bukkit.getWorlds())
-        {
-            if(w.getEnvironment() == World.Environment.THE_END)
-            {
+        for (World w : Bukkit.getWorlds()) {
+            if (w.getEnvironment() == World.Environment.THE_END) {
                 end = w;
                 break;
                 //I Sure hope that you do not have multiple "End" worlds, otherwise this might not work correctly
             }
         }
 
-        if(end == null)
-        {
+        if (end == null) {
             //no end world was found to teleport to, aborting
             return false;
         }
